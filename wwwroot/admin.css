@@ -7,6 +7,7 @@
     --muted: #a7a9ad;
     --flare: #ffac77;
     --mono: "IBM Plex Mono", Consolas, monospace;
+    --ease-out: cubic-bezier(.23, 1, .32, 1);
     font: 400 15px/1.55 Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
     background: var(--canvas);
     color: var(--ink);
@@ -79,9 +80,8 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .login-form button { display: flex; justify-content: space-between; align-items: center; }
 
 select, dialog {
-    background: linear-gradient(135deg, #323239e8, #161719ed);
+    background: #000;
     border: 1px solid #ffffff32;
-    backdrop-filter: blur(20px) saturate(125%);
 }
 @supports (appearance: base-select) {
     select, ::picker(select) { appearance: base-select; }
@@ -91,14 +91,22 @@ select, dialog {
         border: 1px solid #ffffff36;
         border-radius: 9px;
         color: var(--ink);
-        background: #232428e6;
-        backdrop-filter: blur(20px) saturate(125%);
-        box-shadow: 0 12px 32px #0006;
+        background: rgb(8 8 8 / 64%);
+        backdrop-filter: blur(16px);
+        transform-origin: top center;
     }
     select::picker-icon { color: var(--muted); }
     option { padding: 8px 12px; border-radius: 5px; }
     option:hover, option:focus-visible { background: #ffffff14; }
-    option:checked { color: var(--flare); }
+    option:checked { color: #fff; }
+    option::checkmark {
+        content: "";
+        width: 6px;
+        height: 6px;
+        align-self: center;
+        border-radius: 50%;
+        background: currentColor;
+    }
 }
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .section-head h2, .section-head h3 { margin: 0; }
@@ -109,9 +117,9 @@ button:is([data-key],[data-hit]) { font: inherit; border: 0; border-radius: 3px;
 [data-revoke][value=true] { color: var(--flare); border-color: currentColor; }
 dialog {
     color: var(--ink); width: min(800px, calc(100vw - 32px)); max-height: min(84dvh, 950px);
-    border-radius: 16px; padding: 0; box-shadow: 0 20px 100px #0008; overscroll-behavior: contain;
+    border-radius: 8px; padding: 0; overscroll-behavior: contain;
 }
-dialog::backdrop { background: #07080ab0; backdrop-filter: blur(5px); }
+dialog::backdrop { background: rgb(0 0 0 / 44%); backdrop-filter: blur(9px); }
 dialog > header { padding: 20px 24px; border-bottom: 1px solid var(--line); }
 .dialog-content { padding: 24px; }
 .dialog-content pre { background: #090a0c80; border: 1px solid var(--line); border-radius: 8px; padding: 14px; max-height: 42vh; overflow: auto; }
@@ -120,6 +128,42 @@ dialog > header { padding: 20px 24px; border-bottom: 1px solid var(--line); }
 .wide { grid-column: 1 / -1; }
 #feedback { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 8px 18px; border-radius: 24px; background: #313236; }
 #feedback:empty { display: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+    .login-wrap, main#overview { animation: page-enter 240ms var(--ease-out); }
+    @keyframes page-enter {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: none; }
+    }
+    dialog, dialog::backdrop {
+        --duration: 220ms;
+        opacity: 0;
+        transition: opacity var(--duration) var(--ease-out),
+                    transform var(--duration) var(--ease-out),
+                    display var(--duration) allow-discrete,
+                    overlay var(--duration) allow-discrete;
+    }
+    dialog { transform: translateY(5px) scale(.98); }
+    dialog[open], dialog[open]::backdrop { opacity: 1; }
+    dialog[open] { transform: none; }
+    dialog:not([open]), dialog:not([open])::backdrop { pointer-events: none; }
+    @starting-style {
+        dialog[open], dialog[open]::backdrop { opacity: 0; }
+        dialog[open] { transform: translateY(5px) scale(.98); }
+    }
+    @supports (appearance: base-select) {
+        ::picker(select) {
+            opacity: 0;
+            transform: translateY(-3px) scale(.98);
+            transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out),
+                        display 180ms allow-discrete, overlay 180ms allow-discrete;
+        }
+        select:open::picker(select) { opacity: 1; transform: none; }
+        @starting-style {
+            select:open::picker(select) { opacity: 0; transform: translateY(-3px) scale(.98); }
+        }
+    }
+}
 @media (max-width: 740px) {
     .wrap { width: calc(100% - 32px); }
     .bar .wrap { flex-wrap: wrap; gap: 12px; padding: 14px 0; min-height: 60px; }
