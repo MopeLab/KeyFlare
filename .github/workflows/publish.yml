@@ -1,0 +1,40 @@
+name: Publish
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.rid }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            runner: ubuntu-latest
+          - rid: win-x64
+            runner: windows-latest
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '11.0.x'
+
+      - name: Publish framework-dependent application
+        run: dotnet publish KeyFlare.csproj -c Release -r ${{ matrix.rid }} --self-contained false -o "${{ runner.temp }}/publish"
+
+      - name: Upload publish directory
+        uses: actions/upload-artifact@v7
+        with:
+          name: KeyFlare-${{ matrix.rid }}
+          path: ${{ runner.temp }}/publish/
+          if-no-files-found: error
