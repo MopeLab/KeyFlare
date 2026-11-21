@@ -32,8 +32,11 @@ public sealed class Store(IConfiguration config, IHostEnvironment environment)
         using var db = Open();
         using var command = Command(db, """
             PRAGMA journal_mode=WAL;
-            CREATE TABLE IF NOT EXISTS keys(id INTEGER PRIMARY KEY, label TEXT NOT NULL, secret TEXT NOT NULL UNIQUE, active INTEGER NOT NULL DEFAULT 1);
-            CREATE TABLE IF NOT EXISTS hits(id INTEGER PRIMARY KEY, key_id INTEGER NOT NULL REFERENCES keys(id), time TEXT NOT NULL, protocol TEXT NOT NULL, endpoint TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS keys(id INTEGER PRIMARY KEY, label TEXT NOT NULL, secret TEXT NOT NULL UNIQUE, active INTEGER NOT NULL DEFAULT 1,
+                created TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')));
+            CREATE TABLE IF NOT EXISTS hits(id INTEGER PRIMARY KEY, key_id INTEGER NOT NULL REFERENCES keys(id), time TEXT NOT NULL, protocol TEXT NOT NULL, endpoint TEXT NOT NULL,
+                method TEXT NOT NULL, target TEXT NOT NULL, ua TEXT NOT NULL, model TEXT, input TEXT NOT NULL, headers TEXT NOT NULL, body BLOB NOT NULL, peer_ip TEXT, client_ip TEXT);
+            CREATE INDEX IF NOT EXISTS hits_key_id ON hits(key_id,id);
             CREATE TABLE IF NOT EXISTS channels(id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, url TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS deliveries(hit_id INTEGER REFERENCES hits(id), channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
                 attempts INTEGER NOT NULL DEFAULT 0, next_try INTEGER NOT NULL DEFAULT 0, state TEXT NOT NULL DEFAULT 'pending', PRIMARY KEY(hit_id, channel_id));
@@ -58,15 +61,26 @@ public sealed class Store(IConfiguration config, IHostEnvironment environment)
         return issued;
     }
 
-    public bool Record(string secret, string protocol, string endpoint, bool generation)
+    public bool IsActive(string secret)
     {
         if (secret.Length is 0 or > 256) return false;
         using var db = Open();
+        using var command = Command(db, "SELECT 1 FROM keys WHERE secret=$secret AND active=1", ("$secret", secret));
+        return command.ExecuteScalar() is not null;
+    }
+
+    public bool Record(string secret, string protocol, string endpoint, bool generation, RequestCapture request)
+    {
+        using var db = Open();
         using var tx = db.BeginTransaction();
         using var insert = Command(db, """
-            INSERT INTO hits(key_id,time,protocol,endpoint)
-            SELECT id,$time,$protocol,$endpoint FROM keys WHERE secret=$secret AND active=1 RETURNING id
-            """, ("$time", DateTimeOffset.UtcNow.ToString("O")), ("$protocol", protocol), ("$endpoint", endpoint), ("$secret", secret));
+            INSERT INTO hits(key_id,time,protocol,endpoint,method,target,ua,model,input,headers,body,peer_ip,client_ip)
+            SELECT id,$time,$protocol,$endpoint,$method,$target,$ua,$model,$input,$headers,$body,$peer,$client
+            FROM keys WHERE secret=$secret AND active=1 RETURNING id
+            """, ("$time", DateTimeOffset.UtcNow.ToString("O")), ("$protocol", protocol), ("$endpoint", endpoint), ("$secret", secret),
+            ("$method", request.Method), ("$target", request.Target), ("$ua", request.UserAgent), ("$model", (object?)request.Model ?? DBNull.Value),
+            ("$input", request.Input), ("$headers", request.Headers), ("$body", request.Body),
+            ("$peer", (object?)request.PeerIp ?? DBNull.Value), ("$client", (object?)request.ClientIp ?? DBNull.Value));
         insert.Transaction = tx;
         if (insert.ExecuteScalar() is not long id) return false;
         if (generation)

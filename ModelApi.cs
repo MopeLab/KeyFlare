@@ -9,13 +9,13 @@ public static class ModelApi
 
     public static void MapModelApi(this WebApplication app)
     {
-        app.MapGet("/v1/models", (HttpContext c, Store store) =>
+        app.MapGet("/v1/models", async (HttpContext c, Store store) =>
         {
             if (c.Request.Headers.ContainsKey("x-goog-api-key") || c.Request.Query.ContainsKey("key"))
-                return GeminiModels(c, store, "/v1/models");
+                return await GeminiModels(c, store);
             bool claude = c.Request.Headers.ContainsKey("x-api-key") || c.Request.Headers.ContainsKey("anthropic-version");
             var protocol = claude ? Claude : OpenAI;
-            if (!Record(c, store, protocol, "/v1/models", false)) return Error(protocol, 401);
+            if (await Record(c, store, protocol, false) is null) return Error(protocol, 401);
             return claude
                 ? Results.Json(new { data = new[] { new { id = "claude-sonnet-4-5", type = "model", display_name = "Claude Sonnet", created_at = "2025-09-29T00:00:00Z" } }, has_more = false, first_id = "claude-sonnet-4-5", last_id = "claude-sonnet-4-5" })
                 : Results.Json(new { @object = "list", data = new[] { new { id = "gpt-4o", @object = "model", created = 0, owned_by = "openai" } } });
@@ -26,7 +26,7 @@ public static class ModelApi
         foreach (var version in new[] { "v1", "v1beta" })
         {
             var models = "/" + version + "/models";
-            if (version == "v1beta") app.MapGet(models, (HttpContext c, Store s) => GeminiModels(c, s, models));
+            if (version == "v1beta") app.MapGet(models, (HttpContext c, Store s) => GeminiModels(c, s));
             foreach (var method in new[] { "generateContent", "streamGenerateContent" })
             {
                 var route = models + "/{model}:" + method;
@@ -35,11 +35,11 @@ public static class ModelApi
         }
     }
 
-    private static IResult GeminiModels(HttpContext c, Store s, string route) => Record(c, s, Gemini, route, false)
+    private static async Task<IResult> GeminiModels(HttpContext c, Store s) => await Record(c, s, Gemini, false) is not null
         ? Results.Json(new { models = new[] { new { name = "models/gemini-2.5-flash", displayName = "Gemini Flash", supportedGenerationMethods = new[] { "generateContent", "streamGenerateContent" } } } })
         : Error(Gemini, 403);
 
-    private static bool Record(HttpContext c, Store s, string protocol, string route, bool generate)
+    private static async Task<(RequestCapture Capture, JsonElement Json)?> Record(HttpContext c, Store s, string protocol, bool generate)
     {
         var bearer = c.Request.Headers.Authorization.ToString();
         string secret = protocol switch
@@ -49,7 +49,9 @@ public static class ModelApi
             _ when bearer.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) => bearer[7..],
             _ => ""
         };
-        return s.Record(secret, protocol, route, generate);
+        if (!s.IsActive(secret)) return null;
+        var data = await RequestCapture.Read(c);
+        return s.Record(secret, protocol, c.Request.Path.Value!, generate, data.Capture) ? data : null;
     }
 
     private static IResult Error(string protocol, int code)
@@ -67,13 +69,10 @@ public static class ModelApi
 
     private static async Task<IResult> Generate(HttpContext c, Store s, string protocol, string route)
     {
-        if (!Record(c, s, protocol, route, true)) return Error(protocol, protocol == Gemini ? 403 : 401);
-        JsonElement body;
-        try { body = await JsonSerializer.DeserializeAsync<JsonElement>(c.Request.Body, cancellationToken: c.RequestAborted); }
-        catch (JsonException) { return Error(protocol, 400); }
+        if (await Record(c, s, protocol, true) is not { } data) return Error(protocol, protocol == Gemini ? 403 : 401);
+        var body = data.Json;
         if (body.ValueKind != JsonValueKind.Object) return Error(protocol, 400);
-        var model = c.Request.RouteValues["model"] as string ??
-            (body.TryGetProperty("model", out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null);
+        var model = data.Capture.Model;
         if (string.IsNullOrWhiteSpace(model)) return Error(protocol, 400);
         bool stream = body.TryGetProperty("stream", out var flag) && flag.ValueKind == JsonValueKind.True;
         var suffix = Guid.NewGuid().ToString("N");
