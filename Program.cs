@@ -5,4 +5,5 @@ builder.Logging.AddFilter("Microsoft.AspNetCore.Hosting.Diagnostics", LogLevel.W
 builder.Services.AddSingleton<Store>();
 var app = builder.Build();
 app.Services.GetRequiredService<Store>().Initialize();
+app.MapModelApi();
 app.Run();
