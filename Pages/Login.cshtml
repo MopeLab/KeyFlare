@@ -3,12 +3,25 @@
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KeyFlare 管理登录</title></head>
-<body>
-<h1>KeyFlare 管理登录</h1>
-@if (Model.Changed) { <p>管理密码已修改，请重新登录。</p> }
-@if (Model.InvalidPassword) { <p role="alert">管理密码有误。</p> }
-<form method="post">
-    <label>管理密码<input name="password" type="password" autocomplete="current-password" maxlength="1024" required autofocus></label>
-    <button>登录</button>
-</form></body></html>
+<head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>管理登录 · KeyFlare</title>
+    <link rel="stylesheet" href="~/admin.css" asp-append-version="true">
+</head>
+<body class="login-page">
+<header class="bar"><div class="wrap"><span class="brand">KeyFlare</span></div></header>
+<main class="login-wrap">
+    <div class="login-art" aria-hidden="true"><span class="orbit"></span></div>
+    <div class="login-form">
+        <h1>管理登录</h1>
+        @if (Model.Changed) { <p class="notice" role="status">管理密码已修改，请重新登录。</p> }
+        @if (Model.InvalidPassword) { <p class="notice error" role="alert">管理密码有误。</p> }
+        <form method="post">
+            <input type="hidden" asp-for="ReturnUrl">
+            <label>管理密码<input name="password" type="password" autocomplete="current-password" maxlength="1024" required autofocus></label>
+            <label class="check"><input name="remember" value="true" type="checkbox" checked>在此浏览器保持登录 8 小时</label>
+            <button class="primary">登录 <span aria-hidden="true">→</span></button>
+        </form>
+    </div>
+</main>
+</body></html>

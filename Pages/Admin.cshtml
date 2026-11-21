@@ -4,65 +4,97 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-    <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>KeyFlare 管理面板</title>
-    <style>
-        * { box-sizing:border-box } body { max-width:76rem; margin:auto; padding:1.5rem; color:#202630; background:#f6f8fa; font:1rem/1.6 "Segoe UI",sans-serif }
-        section { background:white; border:1px solid #ccd4dc; border-radius:.5rem; padding:1rem 1.3rem; margin:1rem 0; overflow:auto }
-        form { display:flex; gap:.7rem; align-items:end; flex-wrap:wrap } label { display:grid } input,select,button { font:inherit; padding:.3rem .5rem }
-        button { cursor:pointer } table { border-collapse:collapse; width:100%; margin-top:1rem } th,td { text-align:left; padding:.4rem; border-bottom:1px solid #dae0e6 }
-        pre { white-space:pre-wrap; overflow-wrap:anywhere } h2 { margin-top:0 } nav { display:flex; gap:1rem } [role=alert] { color:#952f23 }
-    </style>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>管理面板 · KeyFlare</title>
+    <link rel="stylesheet" href="~/admin.css" asp-append-version="true">
 </head>
 <body>
-<h1>KeyFlare 管理面板</h1>
-@if (Model.Error is not null) { <p role="alert">@Model.Error</p> }
-@if (Model.Issued.Count > 0)
-{
-    <section><h2>新生成的密钥</h2>
-    <pre>@string.Join("\n", Model.Issued.Select(k => $"#{k.Id}  {k.Secret}"))</pre></section>
-}
-<section><h2>诱饵密钥</h2>
-<form method="post" asp-page-handler="Issue">
-    <label>投放标签<input name="label" required maxlength="100"></label>
-    <label>密钥外观<select name="kind"><option>OpenAI</option><option>Anthropic</option><option>Gemini</option></select></label>
-    <label>数量<input type="number" name="count" min="1" max="100" value="1" required></label><button>生成密钥</button>
-</form>
-<table><thead><tr><th>编号</th><th>标签</th><th>API Key</th><th>状态</th><th>操作</th></tr></thead><tbody>
-@foreach (var key in Model.Keys)
-{
-    <tr><td>#@key.Id</td><td>@key.Label</td><td><code>@key.Secret</code></td><td>@(key.Active ? "启用" : "已吊销")</td>
-    <td>@if (key.Active) { <form method="post" asp-page-handler="Revoke"><input type="hidden" name="id" value="@key.Id"><button>吊销</button></form> }</td></tr>
-}
-</tbody></table></section>
-<section><h2>调用记录</h2>
-@if (Model.Hits.Count == 0) { <p>暂无命中记录。</p> }
-else {
-<table><thead><tr><th>时间（UTC）</th><th>密钥</th><th>协议</th><th>接口</th><th>告警</th></tr></thead><tbody>
-@foreach (var row in Model.Hits)
-{
-    <tr><td>@row.Hit.Time</td><td>#@row.Hit.KeyId</td><td>@row.Hit.Protocol</td><td><code>@row.Hit.Endpoint</code></td><td>@row.Alerts</td></tr>
-}
-</tbody></table>
-}
-<nav>@if (Model.CurrentPage > 1) { <a href="?p=@(Model.CurrentPage-1)">上一页</a> }
-@if (Model.HasMore) { <a href="?p=@(Model.CurrentPage+1)">下一页</a> }</nav></section>
-<section><h2>告警渠道</h2>
-<p>Bark 填写包含设备 Key 的推送地址，Webhook 填写接收 JSON POST 的地址。</p>
-<form method="post" asp-page-handler="Channel">
-    <label>类型<select name="kind"><option>Bark</option><option>Webhook</option></select></label>
-    <label>接收地址<input type="url" name="url" required autocomplete="off"></label><button>添加渠道</button>
-</form>
-<table><thead><tr><th>编号</th><th>类型</th><th>主机</th><th>操作</th></tr></thead><tbody>
-@foreach (var channel in Model.Channels)
-{
-    <tr><td>#@channel.Id</td><td>@channel.Kind</td><td>@channel.Host</td><td><form method="post" asp-page-handler="Remove"><input type="hidden" name="id" value="@channel.Id"><button>移除</button></form></td></tr>
-}
-</tbody></table></section>
-<section><h2>管理密码</h2>
-<form method="post" asp-page-handler="Password">
-    <label>当前密码<input type="password" name="current" autocomplete="current-password" required></label>
-    <label>新密码<input type="password" name="replacement" autocomplete="new-password" maxlength="1024" required></label>
-    <label>确认新密码<input type="password" name="confirmation" autocomplete="new-password" required></label>
-    <button>修改密码</button>
-</form></section></body></html>
+<header class="bar"><div class="wrap">
+    <a class="brand" href="#overview">KeyFlare</a>
+    <nav aria-label="面板导航"><a href="#keys">诱饵密钥</a><a href="#hits">调用记录</a><a href="#channels">告警渠道</a><a href="#password">管理密码</a></nav>
+    <form method="post" asp-page-handler="Logout"><button>退出登录</button></form>
+</div></header>
+<main class="wrap" id="overview">
+    <div class="overview">
+        <h1>管理面板</h1>
+        <dl class="metrics">
+            <div><dt>启用密钥</dt><dd>@Model.Keys.Count(k => k.Active)</dd></div>
+            <div><dt>累计命中</dt><dd>@Model.TotalHits</dd></div>
+            <div><dt>告警渠道</dt><dd>@Model.Channels.Count</dd></div>
+        </dl>
+    </div>
+    @if (Model.Error is not null) { <p role="alert" class="notice error">@Model.Error</p> }
+    <section id="keys">
+        <h2>诱饵密钥</h2>
+        <form class="fields" method="post" asp-page-handler="Issue">
+            <label>投放标签<input name="label" required maxlength="100"></label>
+            <label>密钥外观<select name="kind"><option>OpenAI</option><option>Anthropic</option><option>Gemini</option></select></label>
+            <label class="quantity">数量<input type="number" name="count" min="1" max="100" value="1" required></label>
+            <button class="primary">生成密钥</button>
+        </form>
+        @if (Model.Issued.Count > 0)
+        {
+            <details open><summary>新生成的密钥（@Model.Issued.Count）</summary><pre>@string.Join("\n", Model.Issued.Select(k => $"#{k.Id}  {k.Secret}"))</pre></details>
+        }
+        @if (Model.Keys.Count == 0) { <p class="empty">暂无诱饵密钥</p> }
+        else {
+            <div class="scroll"><table><thead><tr><th>编号</th><th>标签</th><th>API Key</th><th>状态</th><th>操作</th></tr></thead><tbody>
+            @foreach (var key in Model.Keys)
+            {
+                <tr><td class="mono">#@key.Id</td><td>@key.Label</td><td class="secret"><code>@key.Secret</code></td>
+                <td><span class="state @(key.Active ? "active" : "")">@(key.Active ? "启用" : "已吊销")</span></td>
+                <td>@if (key.Active) { <form method="post" asp-page-handler="Revoke"><input type="hidden" name="id" value="@key.Id"><button>吊销</button></form> }</td></tr>
+            }
+            </tbody></table></div>
+        }
+    </section>
+    <section id="hits">
+        <h2>调用记录</h2>
+        @if (Model.Hits.Count == 0) { <p class="empty">暂无命中记录</p> }
+        else {
+            <div class="scroll"><table><thead><tr><th>时间（UTC）</th><th>密钥</th><th>协议</th><th>接口</th><th>告警</th></tr></thead><tbody>
+            @foreach (var row in Model.Hits)
+            {
+                <tr><td class="mono"><time datetime="@row.Hit.Time">@DateTimeOffset.Parse(row.Hit.Time).UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</time></td>
+                <td class="mono">#@row.Hit.KeyId</td><td>@row.Hit.Protocol</td><td><code>@row.Hit.Endpoint</code></td><td>@row.Alerts</td></tr>
+            }
+            </tbody></table></div>
+        }
+        @if (Model.CurrentPage > 1 || Model.HasMore)
+        {
+            <nav class="pager" aria-label="记录分页">
+                @if (Model.CurrentPage > 1) { <a href="?p=@(Model.CurrentPage-1)#hits">上一页</a> }
+                @if (Model.HasMore) { <a href="?p=@(Model.CurrentPage+1)#hits">下一页</a> }
+            </nav>
+        }
+    </section>
+    <div class="settings">
+        <section id="channels">
+            <h2>告警渠道</h2>
+            <form class="stack" method="post" asp-page-handler="Channel">
+                <label>类型<select name="kind"><option>Bark</option><option>Webhook</option></select></label>
+                <label>接收地址<input type="url" name="url" required autocomplete="off" aria-describedby="channel-tip"></label>
+                <p id="channel-tip">Bark 地址需包含设备 Key。Webhook 需支持 JSON POST。</p>
+                <button>添加渠道</button>
+            </form>
+            @if (Model.Channels.Count == 0) { <p class="empty">暂无告警渠道</p> }
+            else {
+                <div class="scroll"><table><thead><tr><th>编号</th><th>类型</th><th>主机</th><th>操作</th></tr></thead><tbody>
+                @foreach (var channel in Model.Channels)
+                {
+                    <tr><td class="mono">#@channel.Id</td><td>@channel.Kind</td><td>@channel.Host</td><td><form method="post" asp-page-handler="Remove"><input type="hidden" name="id" value="@channel.Id"><button>移除</button></form></td></tr>
+                }
+                </tbody></table></div>
+            }
+        </section>
+        <section id="password">
+            <h2>管理密码</h2>
+            <form class="stack" method="post" asp-page-handler="Password">
+                <label>当前密码<input type="password" name="current" autocomplete="current-password" required></label>
+                <label>新密码<input type="password" name="replacement" autocomplete="new-password" maxlength="1024" required></label>
+                <label>确认新密码<input type="password" name="confirmation" autocomplete="new-password" required></label>
+                <button>修改密码</button>
+            </form>
+        </section>
+    </div>
+</main></body></html>

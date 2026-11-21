@@ -16,12 +16,15 @@ public sealed class AdminModel(Store store, AdminPassword credentials) : PageMod
     public List<IssuedKey> Issued { get; private set; } = [];
     public string? Error { get; private set; }
     public int CurrentPage { get; private set; }
+    public long TotalHits { get; private set; }
     public bool HasMore { get; private set; }
 
     public void OnGet(int p = 1)
     {
         CurrentPage = Math.Max(1, p);
         using var db = store.Open();
+        using var count = Store.Command(db, "SELECT COUNT(*) FROM hits");
+        TotalHits = (long)count.ExecuteScalar()!;
         using var keys = Store.Command(db, "SELECT id,label,active,secret FROM keys ORDER BY id DESC");
         using (var r = keys.ExecuteReader())
             while (r.Read()) Keys.Add(new(r.GetInt64(0), r.GetString(1), r.GetBoolean(2), r.GetString(3)));
@@ -53,6 +56,11 @@ public sealed class AdminModel(Store store, AdminPassword credentials) : PageMod
     }
 
     public IActionResult OnPostRevoke(long id) => Change("UPDATE keys SET active=0 WHERE id=$id", id);
+    public async Task<IActionResult> OnPostLogoutAsync()
+    {
+        await HttpContext.SignOutAsync();
+        return RedirectToPage("/Login");
+    }
     public async Task<IActionResult> OnPostPasswordAsync(string? current, string? replacement, string? confirmation)
     {
         if (string.IsNullOrWhiteSpace(replacement) || replacement.Length > 1024 || replacement != confirmation)

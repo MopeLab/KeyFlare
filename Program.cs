@@ -15,6 +15,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     options.Cookie.Name = "KeyFlare.Admin";
     options.Cookie.SameSite = SameSiteMode.Strict;
     options.ExpireTimeSpan = TimeSpan.FromHours(8);
+    options.SlidingExpiration = false;
     options.Events.OnValidatePrincipal = async context =>
     {
         var credentials = context.HttpContext.RequestServices.GetRequiredService<AdminPassword>();
@@ -30,6 +31,7 @@ builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 
 var app = builder.Build();
 app.Services.GetRequiredService<Store>().Initialize();
 app.Services.GetRequiredService<AdminPassword>().Initialize();
+app.UseStaticFiles();
 app.UseRouting();
 app.Use(async (context, next) =>
 {

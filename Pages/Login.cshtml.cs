@@ -10,9 +10,16 @@ public sealed class LoginModel(AdminPassword credentials) : PageModel
 {
     public bool Changed { get; private set; }
     public bool InvalidPassword { get; private set; }
-    public void OnGet(bool changed = false) => Changed = changed;
+    [BindProperty(SupportsGet = true)]
+    public string? ReturnUrl { get; set; }
 
-    public async Task<IActionResult> OnPostAsync(string? password)
+    public IActionResult OnGet(bool changed = false)
+    {
+        Changed = changed;
+        return User.Identity?.IsAuthenticated == true ? RedirectToPage("/Admin") : Page();
+    }
+
+    public async Task<IActionResult> OnPostAsync(string? password, bool remember)
     {
         if (credentials.Verify(password) is not { } stamp)
         {
@@ -21,7 +28,7 @@ public sealed class LoginModel(AdminPassword credentials) : PageModel
             return Page();
         }
         var identity = new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, stamp)], CookieAuthenticationDefaults.AuthenticationScheme);
-        await HttpContext.SignInAsync(new ClaimsPrincipal(identity));
-        return RedirectToPage("/Admin");
+        await HttpContext.SignInAsync(new ClaimsPrincipal(identity), new AuthenticationProperties { IsPersistent = remember });
+        return Url.IsLocalUrl(ReturnUrl) ? LocalRedirect(ReturnUrl) : RedirectToPage("/Admin");
     }
 }
