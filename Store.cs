@@ -1,0 +1,83 @@
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.Data.Sqlite;
+
+namespace KeyFlare;
+
+public sealed record IssuedKey(long Id, string Secret);
+public sealed record Hit(long Id, long KeyId, string Time, string Protocol, string Endpoint);
+
+public sealed class Store(IConfiguration config, IHostEnvironment environment)
+{
+    private readonly string path = Path.GetFullPath(config["KeyFlare:Database"] ?? "App_Data/keyflare.db", environment.ContentRootPath);
+
+    public SqliteConnection Open()
+    {
+        var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, ForeignKeys = true }.ToString());
+        connection.Open();
+        return connection;
+    }
+
+    public static SqliteCommand Command(SqliteConnection db, string sql, params (string Name, object Value)[] parameters)
+    {
+        var command = db.CreateCommand();
+        command.CommandText = sql;
+        foreach (var (name, value) in parameters)
+            command.Parameters.AddWithValue(name, value);
+        return command;
+    }
+
+    public void Initialize()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        using var db = Open();
+        using var command = Command(db, """
+            PRAGMA journal_mode=WAL;
+            CREATE TABLE IF NOT EXISTS keys(id INTEGER PRIMARY KEY, label TEXT NOT NULL, digest TEXT NOT NULL UNIQUE, active INTEGER NOT NULL DEFAULT 1);
+            CREATE TABLE IF NOT EXISTS hits(id INTEGER PRIMARY KEY, key_id INTEGER NOT NULL REFERENCES keys(id), time TEXT NOT NULL, protocol TEXT NOT NULL, endpoint TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS channels(id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, url TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS deliveries(hit_id INTEGER REFERENCES hits(id), channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+                attempts INTEGER NOT NULL DEFAULT 0, next_try INTEGER NOT NULL DEFAULT 0, state TEXT NOT NULL DEFAULT 'pending', PRIMARY KEY(hit_id, channel_id));
+            """);
+        command.ExecuteNonQuery();
+    }
+
+    private static string Digest(string secret) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(secret)));
+
+    public List<IssuedKey> Issue(string label, int count, string prefix)
+    {
+        using var db = Open();
+        using var tx = db.BeginTransaction();
+        List<IssuedKey> issued = [];
+        for (int i = 0; i < count; i++)
+        {
+            var secret = prefix + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(24));
+            using var insert = Command(db, "INSERT INTO keys(label,digest) VALUES($label,$digest) RETURNING id", ("$label", label), ("$digest", Digest(secret)));
+            insert.Transaction = tx;
+            issued.Add(new((long)insert.ExecuteScalar()!, secret));
+        }
+        tx.Commit();
+        return issued;
+    }
+
+    public bool Record(string secret, string protocol, string endpoint, bool generation)
+    {
+        if (secret.Length is 0 or > 256) return false;
+        using var db = Open();
+        using var tx = db.BeginTransaction();
+        using var insert = Command(db, """
+            INSERT INTO hits(key_id,time,protocol,endpoint)
+            SELECT id,$time,$protocol,$endpoint FROM keys WHERE digest=$digest AND active=1 RETURNING id
+            """, ("$time", DateTimeOffset.UtcNow.ToString("O")), ("$protocol", protocol), ("$endpoint", endpoint), ("$digest", Digest(secret)));
+        insert.Transaction = tx;
+        if (insert.ExecuteScalar() is not long id) return false;
+        if (generation)
+        {
+            using var enqueue = Command(db, "INSERT INTO deliveries(hit_id,channel_id) SELECT $id,id FROM channels", ("$id", id));
+            enqueue.Transaction = tx;
+            enqueue.ExecuteNonQuery();
+        }
+        tx.Commit();
+        return true;
+    }
+}
