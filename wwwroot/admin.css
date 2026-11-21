@@ -129,17 +129,32 @@ dialog > header { padding: 20px 24px; border-bottom: 1px solid var(--line); }
 .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 18px; margin-bottom: 28px; }
 .facts dd { font: inherit; overflow-wrap: anywhere; }
 .wide { grid-column: 1 / -1; }
-#feedback { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 8px 18px; border-radius: 24px; background: #313236; }
-#feedback:empty { display: none; }
+#feedback { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 8px 18px; border-radius: 24px; background: #313236; opacity: 0; pointer-events: none; }
+#feedback.visible { opacity: 1; }
 
 @media (prefers-reduced-motion: no-preference) {
-    .login-wrap, main#overview { animation: page-enter 240ms var(--ease-out); }
+    .login-wrap, main#overview { animation: page-enter 290ms var(--ease-out); }
+    .row-enter { animation: page-enter 280ms var(--ease-out); }
+    #feedback {
+        transform: translate(-50%, 8px) scale(.97);
+        transition: opacity 240ms var(--ease-out), transform 280ms var(--ease-out);
+    }
+    #feedback.visible { transform: translate(-50%, 0) scale(1); }
+    @media (hover: hover) and (pointer: fine) {
+        button, .bar nav a, [data-open-row], select {
+            transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+        }
+        .icon-button svg { transition: transform 180ms var(--ease-out); }
+        .icon-button:hover svg { transform: scale(1.09); }
+        .icon-button:active svg { transform: scale(.96); }
+        select:hover { border-color: #777b81; }
+    }
     @keyframes page-enter {
         from { opacity: 0; transform: translateY(6px); }
         to { opacity: 1; transform: none; }
     }
     dialog, dialog::backdrop {
-        --duration: 220ms;
+        --duration: 270ms;
         opacity: 0;
         transition: opacity var(--duration) var(--ease-out),
                     transform var(--duration) var(--ease-out),
@@ -158,8 +173,8 @@ dialog > header { padding: 20px 24px; border-bottom: 1px solid var(--line); }
         ::picker(select) {
             opacity: 0;
             transform: translateY(-3px) scale(.98);
-            transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out),
-                        display 180ms allow-discrete, overlay 180ms allow-discrete;
+            transition: opacity 225ms var(--ease-out), transform 225ms var(--ease-out),
+                        display 225ms allow-discrete, overlay 225ms allow-discrete;
         }
         select:open::picker(select) { opacity: 1; transform: none; }
         @starting-style {

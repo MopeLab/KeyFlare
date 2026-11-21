@@ -47,7 +47,7 @@
             <div class="scroll"><table><thead><tr><th>编号</th><th>标签</th><th>API Key</th><th>状态</th><th>操作</th></tr></thead><tbody>
             @foreach (var key in Model.Keys)
             {
-                <tr data-open-row><td class="mono"><button type="button" data-key="@key.Id" aria-label="查看密钥 #@key.Id 详情">#@key.Id</button></td><td>@key.Label</td><td class="secret"><code>@key.Secret</code></td>
+                <tr data-open-row class="@(Model.Issued.Any(k => k.Id == key.Id) ? "row-enter" : null)"><td class="mono"><button type="button" data-key="@key.Id" aria-label="查看密钥 #@key.Id 详情">#@key.Id</button></td><td>@key.Label</td><td class="secret"><code>@key.Secret</code></td>
                 <td><span class="state @(key.Active ? "active" : "")">@(key.Active ? "启用" : "已吊销")</span></td>
                 <td><form method="post" asp-page-handler="@(key.Active ? "Revoke" : "Restore")">
                     <input type="hidden" name="id" value="@key.Id">
@@ -76,7 +76,7 @@
                 <div class="scroll"><table><thead><tr><th>编号</th><th>类型</th><th>主机</th><th>操作</th></tr></thead><tbody>
                 @foreach (var channel in Model.Channels)
                 {
-                    <tr><td class="mono">#@channel.Id</td><td>@channel.Kind</td><td>@channel.Host</td><td><form method="post" asp-page-handler="Remove"><input type="hidden" name="id" value="@channel.Id"><button>移除</button></form></td></tr>
+                    <tr class="@(TempData["NewChannel"] as string == channel.Id.ToString() ? "row-enter" : null)"><td class="mono">#@channel.Id</td><td>@channel.Kind</td><td>@channel.Host</td><td><form method="post" asp-page-handler="Remove"><input type="hidden" name="id" value="@channel.Id"><button>移除</button></form></td></tr>
                 }
                 </tbody></table></div>
             }

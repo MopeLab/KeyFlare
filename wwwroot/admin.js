@@ -7,8 +7,9 @@ let feedbackTimer;
 
 function notify(message) {
     feedback.textContent = message;
+    feedback.classList.add("visible");
     clearTimeout(feedbackTimer);
-    feedbackTimer = setTimeout(() => { feedback.textContent = ""; }, 3000);
+    feedbackTimer = setTimeout(() => feedback.classList.remove("visible"), 3000);
 }
 
 async function loadFragment(container, handler, parameters) {
@@ -27,8 +28,14 @@ async function loadFragment(container, handler, parameters) {
         if (!response.ok) throw new Error();
         const html = await response.text();
         if (controller.signal.aborted) return false;
+        const previousPage = container.querySelector("[data-history-page]")?.dataset.historyPage;
+        const previousHits = new Set(Array.from(container.querySelectorAll("[data-hit]"), button => button.dataset.hit));
         container.innerHTML = html;
-        feedback.textContent = "";
+        if (previousPage === "1" && container.querySelector("[data-history-page]")?.dataset.historyPage === "1") {
+            for (const button of container.querySelectorAll("[data-hit]")) {
+                if (!previousHits.has(button.dataset.hit)) button.closest("tr").classList.add("row-enter");
+            }
+        }
         return true;
     } catch (error) {
         if (error.name !== "AbortError") {

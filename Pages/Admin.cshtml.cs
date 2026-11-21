@@ -127,8 +127,8 @@ public sealed class AdminModel(Store store, AdminPassword credentials) : PageMod
             || (uri.Scheme != "https" && !(uri.Scheme == "http" && uri.IsLoopback)) || uri.UserInfo.Length > 0 || uri.Fragment.Length > 0)
             return Invalid("请输入 HTTPS 接收地址。本机测试也可使用回环 HTTP 地址。");
         using var db = store.Open();
-        using var insert = Store.Command(db, "INSERT INTO channels(kind,url) VALUES($kind,$url)", ("$kind", kind), ("$url", uri.AbsoluteUri));
-        insert.ExecuteNonQuery();
+        using var insert = Store.Command(db, "INSERT INTO channels(kind,url) VALUES($kind,$url) RETURNING id", ("$kind", kind), ("$url", uri.AbsoluteUri));
+        TempData["NewChannel"] = insert.ExecuteScalar()!.ToString();
         return RedirectToPage();
     }
 
