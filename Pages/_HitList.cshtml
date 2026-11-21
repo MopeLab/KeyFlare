@@ -14,8 +14,8 @@ else {
 @if (Model.Page > 1 || Model.HasMore)
 {
     <nav class="pager" aria-label="调用记录分页">
-        @if (Model.Page > 1) { <button type="button" data-page="@(Model.Page-1)" data-key-page="@Model.KeyId">上一页</button> }
-        @if (Model.HasMore) { <button type="button" data-page="@(Model.Page+1)" data-key-page="@Model.KeyId">下一页</button> }
+        @if (Model.Page > 1) { <button class="icon-button" type="button" data-page="@(Model.Page-1)" data-key-page="@Model.KeyId" aria-label="上一页" title="上一页"><svg aria-hidden="true"><use href="#icon-prev"/></svg></button> }
+        @if (Model.HasMore) { <button class="icon-button" type="button" data-page="@(Model.Page+1)" data-key-page="@Model.KeyId" aria-label="下一页" title="下一页"><svg aria-hidden="true"><use href="#icon-next"/></svg></button> }
     </nav>
 }
 </div>

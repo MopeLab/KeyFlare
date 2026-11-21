@@ -110,6 +110,9 @@ dialog {
 }
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .section-head h2, .section-head h3 { margin: 0; }
+.icon-button { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border-color: transparent; }
+.icon-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+@media (pointer: coarse) { .icon-button { width: 44px; height: 44px; } }
 [data-open-row] { cursor: pointer; }
 [data-open-row]:hover, [data-open-row]:focus-within { background: #ffffff08; }
 button:is([data-key],[data-hit]) { font: inherit; border: 0; border-radius: 3px; padding: 2px 0; color: var(--flare); }
