@@ -1,10 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.Data.Sqlite;
+using Microsoft.AspNetCore.Authentication;
+using System.Security.Claims;
 
 namespace KeyFlare.Pages;
 
-public sealed class AdminModel(Store store) : PageModel
+public sealed class AdminModel(Store store, AdminPassword credentials) : PageModel
 {
     public record KeyRow(long Id, string Label, bool Active);
     public record ChannelRow(long Id, string Kind, string Host);
@@ -52,6 +53,15 @@ public sealed class AdminModel(Store store) : PageModel
     }
 
     public IActionResult OnPostRevoke(long id) => Change("UPDATE keys SET active=0 WHERE id=$id", id);
+    public async Task<IActionResult> OnPostPasswordAsync(string? current, string? replacement, string? confirmation)
+    {
+        if (string.IsNullOrWhiteSpace(replacement) || replacement.Length > 1024 || replacement != confirmation)
+            return Invalid("请填写新密码，并确保两次输入一致。");
+        if (!credentials.Change(current, replacement, User.FindFirstValue(ClaimTypes.NameIdentifier)))
+            return Invalid("当前管理密码有误。");
+        await HttpContext.SignOutAsync();
+        return RedirectToPage("/Login", new { changed = true });
+    }
     public IActionResult OnPostRemove(long id) => Change("DELETE FROM channels WHERE id=$id", id);
 
     public IActionResult OnPostChannel(string? kind, string? url)

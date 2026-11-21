@@ -1,4 +1,4 @@
-@page
+@page "/admin"
 @model KeyFlare.Pages.AdminModel
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 <!doctype html>
@@ -58,4 +58,11 @@ else {
 {
     <tr><td>#@channel.Id</td><td>@channel.Kind</td><td>@channel.Host</td><td><form method="post" asp-page-handler="Remove"><input type="hidden" name="id" value="@channel.Id"><button>移除</button></form></td></tr>
 }
-</tbody></table></section></body></html>
+</tbody></table></section>
+<section><h2>管理密码</h2>
+<form method="post" asp-page-handler="Password">
+    <label>当前密码<input type="password" name="current" autocomplete="current-password" required></label>
+    <label>新密码<input type="password" name="replacement" autocomplete="new-password" maxlength="1024" required></label>
+    <label>确认新密码<input type="password" name="confirmation" autocomplete="new-password" required></label>
+    <button>修改密码</button>
+</form></section></body></html>

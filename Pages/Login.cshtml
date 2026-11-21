@@ -1,0 +1,14 @@
+@page "/admin/login"
+@model KeyFlare.Pages.LoginModel
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KeyFlare 管理登录</title></head>
+<body>
+<h1>KeyFlare 管理登录</h1>
+@if (Model.Changed) { <p>管理密码已修改，请重新登录。</p> }
+@if (Model.InvalidPassword) { <p role="alert">管理密码有误。</p> }
+<form method="post">
+    <label>管理密码<input name="password" type="password" autocomplete="current-password" maxlength="1024" required autofocus></label>
+    <button>登录</button>
+</form></body></html>
