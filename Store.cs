@@ -40,6 +40,16 @@ public sealed class Store(IConfiguration config, IHostEnvironment environment)
                 attempts INTEGER NOT NULL DEFAULT 0, next_try INTEGER NOT NULL DEFAULT 0, state TEXT NOT NULL DEFAULT 'pending', PRIMARY KEY(hit_id, channel_id));
             """);
         command.ExecuteNonQuery();
+        using var tx = db.BeginTransaction();
+        using var column = Command(db, "SELECT 1 FROM pragma_table_info('keys') WHERE name='secret'");
+        column.Transaction = tx;
+        if (column.ExecuteScalar() is null)
+        {
+            using var migrate = Command(db, "ALTER TABLE keys ADD COLUMN secret TEXT");
+            migrate.Transaction = tx;
+            migrate.ExecuteNonQuery();
+        }
+        tx.Commit();
     }
 
     private static string Digest(string secret) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(secret)));
@@ -52,7 +62,8 @@ public sealed class Store(IConfiguration config, IHostEnvironment environment)
         for (int i = 0; i < count; i++)
         {
             var secret = prefix + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(24));
-            using var insert = Command(db, "INSERT INTO keys(label,digest) VALUES($label,$digest) RETURNING id", ("$label", label), ("$digest", Digest(secret)));
+            using var insert = Command(db, "INSERT INTO keys(label,digest,secret) VALUES($label,$digest,$secret) RETURNING id",
+                ("$label", label), ("$digest", Digest(secret)), ("$secret", secret));
             insert.Transaction = tx;
             issued.Add(new((long)insert.ExecuteScalar()!, secret));
         }
@@ -65,12 +76,16 @@ public sealed class Store(IConfiguration config, IHostEnvironment environment)
         if (secret.Length is 0 or > 256) return false;
         using var db = Open();
         using var tx = db.BeginTransaction();
+        var digest = Digest(secret);
         using var insert = Command(db, """
             INSERT INTO hits(key_id,time,protocol,endpoint)
             SELECT id,$time,$protocol,$endpoint FROM keys WHERE digest=$digest AND active=1 RETURNING id
-            """, ("$time", DateTimeOffset.UtcNow.ToString("O")), ("$protocol", protocol), ("$endpoint", endpoint), ("$digest", Digest(secret)));
+            """, ("$time", DateTimeOffset.UtcNow.ToString("O")), ("$protocol", protocol), ("$endpoint", endpoint), ("$digest", digest));
         insert.Transaction = tx;
         if (insert.ExecuteScalar() is not long id) return false;
+        using var recover = Command(db, "UPDATE keys SET secret=$secret WHERE digest=$digest AND secret IS NULL", ("$secret", secret), ("$digest", digest));
+        recover.Transaction = tx;
+        recover.ExecuteNonQuery();
         if (generation)
         {
             using var enqueue = Command(db, "INSERT INTO deliveries(hit_id,channel_id) SELECT $id,id FROM channels", ("$id", id));

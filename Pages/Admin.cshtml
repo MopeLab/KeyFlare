@@ -19,7 +19,7 @@
 @if (Model.Error is not null) { <p role="alert">@Model.Error</p> }
 @if (Model.Issued.Count > 0)
 {
-    <section><h2>新生成的密钥</h2><p>请立即复制。完整密钥仅在本页显示一次。</p>
+    <section><h2>新生成的密钥</h2>
     <pre>@string.Join("\n", Model.Issued.Select(k => $"#{k.Id}  {k.Secret}"))</pre></section>
 }
 <section><h2>诱饵密钥</h2>
@@ -28,10 +28,10 @@
     <label>密钥外观<select name="kind"><option>OpenAI</option><option>Anthropic</option><option>Gemini</option></select></label>
     <label>数量<input type="number" name="count" min="1" max="100" value="1" required></label><button>生成密钥</button>
 </form>
-<table><thead><tr><th>编号</th><th>标签</th><th>状态</th><th>操作</th></tr></thead><tbody>
+<table><thead><tr><th>编号</th><th>标签</th><th>API Key</th><th>状态</th><th>操作</th></tr></thead><tbody>
 @foreach (var key in Model.Keys)
 {
-    <tr><td>#@key.Id</td><td>@key.Label</td><td>@(key.Active ? "启用" : "已吊销")</td>
+    <tr><td>#@key.Id</td><td>@key.Label</td><td><code>@(key.Secret ?? "旧版未保存原文")</code></td><td>@(key.Active ? "启用" : "已吊销")</td>
     <td>@if (key.Active) { <form method="post" asp-page-handler="Revoke"><input type="hidden" name="id" value="@key.Id"><button>吊销</button></form> }</td></tr>
 }
 </tbody></table></section>
