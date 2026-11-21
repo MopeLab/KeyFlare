@@ -31,7 +31,7 @@
 <table><thead><tr><th>编号</th><th>标签</th><th>API Key</th><th>状态</th><th>操作</th></tr></thead><tbody>
 @foreach (var key in Model.Keys)
 {
-    <tr><td>#@key.Id</td><td>@key.Label</td><td><code>@(key.Secret ?? "旧版未保存原文")</code></td><td>@(key.Active ? "启用" : "已吊销")</td>
+    <tr><td>#@key.Id</td><td>@key.Label</td><td><code>@key.Secret</code></td><td>@(key.Active ? "启用" : "已吊销")</td>
     <td>@if (key.Active) { <form method="post" asp-page-handler="Revoke"><input type="hidden" name="id" value="@key.Id"><button>吊销</button></form> }</td></tr>
 }
 </tbody></table></section>

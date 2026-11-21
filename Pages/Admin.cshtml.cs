@@ -7,7 +7,7 @@ namespace KeyFlare.Pages;
 
 public sealed class AdminModel(Store store, AdminPassword credentials) : PageModel
 {
-    public record KeyRow(long Id, string Label, bool Active, string? Secret);
+    public record KeyRow(long Id, string Label, bool Active, string Secret);
     public record ChannelRow(long Id, string Kind, string Host);
     public record HitRow(Hit Hit, string Alerts);
     public List<KeyRow> Keys { get; } = [];
@@ -24,7 +24,7 @@ public sealed class AdminModel(Store store, AdminPassword credentials) : PageMod
         using var db = store.Open();
         using var keys = Store.Command(db, "SELECT id,label,active,secret FROM keys ORDER BY id DESC");
         using (var r = keys.ExecuteReader())
-            while (r.Read()) Keys.Add(new(r.GetInt64(0), r.GetString(1), r.GetBoolean(2), r.IsDBNull(3) ? null : r.GetString(3)));
+            while (r.Read()) Keys.Add(new(r.GetInt64(0), r.GetString(1), r.GetBoolean(2), r.GetString(3)));
         using var channels = Store.Command(db, "SELECT id,kind,url FROM channels ORDER BY id");
         using (var r = channels.ExecuteReader())
             while (r.Read()) Channels.Add(new(r.GetInt64(0), r.GetString(1), new Uri(r.GetString(2)).Authority));
