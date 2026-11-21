@@ -79,7 +79,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .check input { width: 16px; height: 16px; min-height: 0; accent-color: var(--flare); margin: 0; }
 .login-form button { display: flex; justify-content: space-between; align-items: center; }
 
-select, dialog {
+dialog {
     background: #000;
     border: 1px solid #ffffff32;
 }
