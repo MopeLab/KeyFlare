@@ -1,0 +1,12 @@
+@model KeyFlare.Pages.AdminModel.KeyDetails
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+<dl class="facts">
+    <div><dt>编号 / 标签</dt><dd>#@Model.Key.Id · @Model.Key.Label</dd></div>
+    <div><dt>状态</dt><dd>@(Model.Key.Active ? "启用" : "已吊销")</dd></div>
+    <div class="wide"><dt>API Key</dt><dd><code>@Model.Key.Secret</code></dd></div>
+    <div><dt>创建时间（UTC）</dt><dd>@DateTimeOffset.Parse(Model.Created).UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</dd></div>
+    <div><dt>上次调用（UTC）</dt><dd>@(Model.LastHit is null ? "尚无调用" : DateTimeOffset.Parse(Model.LastHit).UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss"))</dd></div>
+</dl>
+<div class="section-head"><h3>调用记录（@Model.History.Count）</h3>
+    <button type="button" data-page="@Model.History.Page" data-key-page="@Model.Key.Id">刷新</button></div>
+<partial name="_HitList" model="Model.History" />

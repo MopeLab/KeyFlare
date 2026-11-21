@@ -1,0 +1,14 @@
+@model KeyFlare.Pages.AdminModel.HitDetails
+<dl class="facts">
+    <div><dt>调用编号 / 密钥</dt><dd>#@Model.Hit.Id / #@Model.Hit.KeyId</dd></div>
+    <div><dt>时间（UTC）</dt><dd>@DateTimeOffset.Parse(Model.Hit.Time).UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss.fff")</dd></div>
+    <div><dt>协议</dt><dd>@Model.Hit.Protocol</dd></div>
+    <div><dt>请求模型</dt><dd>@(Model.Model.Length == 0 ? "—" : Model.Model)</dd></div>
+    <div><dt>连接来源 IP</dt><dd>@Model.Peer</dd></div>
+    <div><dt>客户端 IP</dt><dd>@(Model.Client.Length == 0 ? "未知" : Model.Client)</dd></div>
+    <div class="wide"><dt>请求接口</dt><dd><code>@Model.Method @Model.Target</code></dd></div>
+    <div class="wide"><dt>User-Agent</dt><dd>@Model.UserAgent</dd></div>
+</dl>
+<h3>输入文本</h3><pre>@(Model.Input.Length == 0 ? "—" : Model.Input)</pre>
+<h3>原始请求头</h3><pre>@Model.Headers</pre>
+<h3>原始请求体 · @Model.BodyFormat</h3><pre>@(Model.Body.Length == 0 ? "（空）" : Model.Body)</pre>

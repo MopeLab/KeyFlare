@@ -1,0 +1,21 @@
+@model KeyFlare.Pages.AdminModel.HitList
+<div data-history-page="@Model.Page" data-count="@Model.Count">
+@if (Model.Rows.Count == 0) { <p class="empty">暂无命中记录</p> }
+else {
+    <div class="scroll"><table><thead><tr><th>时间（UTC）</th><th>密钥</th><th>协议</th><th>接口</th><th>告警</th></tr></thead><tbody>
+    @foreach (var row in Model.Rows)
+    {
+        <tr data-open-row><td class="mono"><button type="button" data-hit="@row.Hit.Id" aria-label="查看调用 #@row.Hit.Id 详情">
+            <time datetime="@row.Hit.Time">@DateTimeOffset.Parse(row.Hit.Time).UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</time>
+        </button></td><td class="mono">#@row.Hit.KeyId</td><td>@row.Hit.Protocol</td><td><code>@row.Hit.Endpoint</code></td><td>@row.Alerts</td></tr>
+    }
+    </tbody></table></div>
+}
+@if (Model.Page > 1 || Model.HasMore)
+{
+    <nav class="pager" aria-label="调用记录分页">
+        @if (Model.Page > 1) { <button type="button" data-page="@(Model.Page-1)" data-key-page="@Model.KeyId">上一页</button> }
+        @if (Model.HasMore) { <button type="button" data-page="@(Model.Page+1)" data-key-page="@Model.KeyId">下一页</button> }
+    </nav>
+}
+</div>

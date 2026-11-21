@@ -19,7 +19,7 @@
         <h1>管理面板</h1>
         <dl class="metrics">
             <div><dt>启用密钥</dt><dd>@Model.Keys.Count(k => k.Active)</dd></div>
-            <div><dt>累计命中</dt><dd>@Model.TotalHits</dd></div>
+            <div><dt>累计命中</dt><dd id="hit-count">@Model.History.Count</dd></div>
             <div><dt>告警渠道</dt><dd>@Model.Channels.Count</dd></div>
         </dl>
     </div>
@@ -41,32 +41,20 @@
             <div class="scroll"><table><thead><tr><th>编号</th><th>标签</th><th>API Key</th><th>状态</th><th>操作</th></tr></thead><tbody>
             @foreach (var key in Model.Keys)
             {
-                <tr><td class="mono">#@key.Id</td><td>@key.Label</td><td class="secret"><code>@key.Secret</code></td>
+                <tr data-open-row><td class="mono"><button type="button" data-key="@key.Id" aria-label="查看密钥 #@key.Id 详情">#@key.Id</button></td><td>@key.Label</td><td class="secret"><code>@key.Secret</code></td>
                 <td><span class="state @(key.Active ? "active" : "")">@(key.Active ? "启用" : "已吊销")</span></td>
-                <td>@if (key.Active) { <form method="post" asp-page-handler="Revoke"><input type="hidden" name="id" value="@key.Id"><button>吊销</button></form> }</td></tr>
+                <td><form method="post" asp-page-handler="@(key.Active ? "Revoke" : "Restore")">
+                    <input type="hidden" name="id" value="@key.Id">
+                    @if (key.Active) { <button type="submit" data-revoke name="confirmed" value="false">吊销</button> }
+                    else { <button>恢复</button> }
+                </form></td></tr>
             }
             </tbody></table></div>
         }
     </section>
     <section id="hits">
-        <h2>调用记录</h2>
-        @if (Model.Hits.Count == 0) { <p class="empty">暂无命中记录</p> }
-        else {
-            <div class="scroll"><table><thead><tr><th>时间（UTC）</th><th>密钥</th><th>协议</th><th>接口</th><th>告警</th></tr></thead><tbody>
-            @foreach (var row in Model.Hits)
-            {
-                <tr><td class="mono"><time datetime="@row.Hit.Time">@DateTimeOffset.Parse(row.Hit.Time).UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss")</time></td>
-                <td class="mono">#@row.Hit.KeyId</td><td>@row.Hit.Protocol</td><td><code>@row.Hit.Endpoint</code></td><td>@row.Alerts</td></tr>
-            }
-            </tbody></table></div>
-        }
-        @if (Model.CurrentPage > 1 || Model.HasMore)
-        {
-            <nav class="pager" aria-label="记录分页">
-                @if (Model.CurrentPage > 1) { <a href="?p=@(Model.CurrentPage-1)#hits">上一页</a> }
-                @if (Model.HasMore) { <a href="?p=@(Model.CurrentPage+1)#hits">下一页</a> }
-            </nav>
-        }
+        <div class="section-head"><h2>调用记录</h2><button type="button" data-refresh>刷新</button></div>
+        <div id="hit-history"><partial name="_HitList" model="Model.History" /></div>
     </section>
     <div class="settings">
         <section id="channels">
@@ -97,4 +85,14 @@
             </form>
         </section>
     </div>
-</main></body></html>
+</main>
+@foreach (var modal in new[] { ("key-dialog","密钥详情"), ("hit-dialog","调用详情") })
+{
+    <dialog id="@modal.Item1" aria-label="@modal.Item2">
+        <header class="section-head"><h2>@modal.Item2</h2><form method="dialog"><button aria-label="关闭">关闭</button></form></header>
+        <div class="dialog-content"></div>
+    </dialog>
+}
+<p id="feedback" role="status"></p>
+<script src="~/admin.js" asp-append-version="true" defer></script>
+</body></html>
