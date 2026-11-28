@@ -38,3 +38,41 @@ jobs:
           name: KeyFlare-${{ matrix.rid }}
           path: ${{ runner.temp }}/publish/
           if-no-files-found: error
+
+  container:
+    name: Build and publish container
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: container-${{ github.ref }}
+      cancel-in-progress: true
+    env:
+      IMAGE: ghcr.io/mopelab/keyflare
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Build container
+        run: docker build --platform linux/amd64 --tag "$IMAGE:$GITHUB_SHA" .
+
+      - name: Verify container startup and SQLite volume
+        run: |
+          docker run --detach --name keyflare-ci --publish 127.0.0.1:18080:8080 \
+            --mount source=keyflare-ci,target=/app/App_Data "$IMAGE:$GITHUB_SHA"
+          curl --fail --silent --show-error --retry 12 --retry-connrefused --retry-delay 1 \
+            http://127.0.0.1:18080/admin/login --output /dev/null
+          docker exec keyflare-ci test -s /app/App_Data/keyflare.db
+
+      - name: Push to GitHub Container Registry
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE:$GITHUB_SHA"
+          docker tag "$IMAGE:$GITHUB_SHA" "$IMAGE:latest"
+          docker push "$IMAGE:latest"

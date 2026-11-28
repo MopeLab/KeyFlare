@@ -6,6 +6,20 @@ KeyFlare 使用 ASP.NET Core 11 和 SQLite，一个应用进程同时提供模�
 
 ## 部署
 
+### 容器部署
+
+容器镜像发布到 GitHub Container Registry，平台为 `linux/amd64`。可使用 `latest` 获取主分支的最新镜像，也可用完整 Git 提交 SHA 固定版本。如果包是私有的，请先用有读取权限的账号登录 `ghcr.io`。[GitHub 容器包](https://github.com/MopeLab/KeyFlare/pkgs/container/keyflare)
+
+```shell
+docker pull ghcr.io/mopelab/keyflare:latest
+docker run -d --name keyflare --restart unless-stopped -p 127.0.0.1:5000:8080 -v keyflare-data:/app/App_Data ghcr.io/mopelab/keyflare:latest
+docker logs keyflare
+```
+
+首次启动时，从日志中的 `KeyFlare AdminPasswd:` 一行取得密码，然后访问 [本机管理面板](http://127.0.0.1:5000/admin)。更新镜像、重建容器时继续挂载 `keyflare-data`，以保留 SQLite 数据。宿主机上的 Nginx 可将请求转发到 `127.0.0.1:5000`。
+
+### 下载发行包
+
 1. 在目标机器上安装对应平台的 **ASP.NET Core Runtime 11.0（x64）**。运行 `dotnet --list-runtimes`，确认列表中有 `Microsoft.AspNetCore.App 11.0.x`。[.NET 11 下载页](https://dotnet.microsoft.com/download/dotnet/11.0)
 2. 打开 [Publish 工作流](https://github.com/MopeLab/KeyFlare/actions/workflows/publish.yml)，选择一次成功运行，从 **Artifacts** 下载 `KeyFlare-linux-x64` 或 `KeyFlare-win-x64`。解压一次，保留整个目录，包括 `wwwroot` 和 SQLite 本机库。
 3. 在含有 `KeyFlare.dll` 的目录打开终端。Linux 和 Windows 均可用以下命令启动：
