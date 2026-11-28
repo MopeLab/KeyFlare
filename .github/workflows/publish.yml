@@ -59,16 +59,25 @@ jobs:
       - name: Build container
         run: docker build --platform linux/amd64 --tag "$IMAGE:$GITHUB_SHA" .
 
-      - name: Verify container startup and SQLite volume
+      - name: Verify SQLite initialization with both mount types
         run: |
-          docker run --detach --name keyflare-ci --publish 127.0.0.1:18080:8080 \
-            --mount source=keyflare-ci,target=/app/App_Data "$IMAGE:$GITHUB_SHA"
-          if ! curl --fail --silent --show-error --max-time 3 --retry 12 --retry-all-errors --retry-delay 1 \
-            http://127.0.0.1:18080/admin/login --output /dev/null; then
-            docker logs keyflare-ci 2>&1 | sed 's/KeyFlare AdminPasswd:.*/KeyFlare AdminPasswd: [redacted]/'
-            exit 1
-          fi
-          docker exec keyflare-ci test -s /app/App_Data/keyflare.db
+          verify_mount() {
+            docker run --detach --name keyflare-ci --publish 127.0.0.1:18080:8080 \
+              --mount "$1" "$IMAGE:$GITHUB_SHA"
+            if ! curl --fail --silent --show-error --max-time 3 --retry 12 --retry-all-errors --retry-delay 1 \
+              http://127.0.0.1:18080/admin/login --output /dev/null; then
+              docker logs keyflare-ci 2>&1 | sed 's/KeyFlare AdminPasswd:.*/KeyFlare AdminPasswd: [redacted]/'
+              exit 1
+            fi
+            docker exec keyflare-ci test -s /app/App_Data/keyflare.db
+            docker rm -f keyflare-ci
+          }
+
+          verify_mount 'source=keyflare-ci,target=/app/App_Data'
+          data_dir=$(mktemp -d)
+          image_uid=$(docker image inspect --format '{{.Config.User}}' "$IMAGE:$GITHUB_SHA")
+          sudo chown "$image_uid" "$data_dir"
+          verify_mount "type=bind,src=$data_dir,dst=/app/App_Data"
 
       - name: Push to GitHub Container Registry
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'

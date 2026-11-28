@@ -18,6 +18,22 @@ docker logs keyflare
 
 首次启动时，从日志中的 `KeyFlare AdminPasswd:` 一行取得密码，然后访问 [本机管理面板](http://127.0.0.1:5000/admin)。更新镜像、重建容器时继续挂载 `keyflare-data`，以保留 SQLite 数据。宿主机上的 Nginx 可将请求转发到 `127.0.0.1:5000`。
 
+#### 挂载宿主机目录
+
+KeyFlare 会自动创建 `/app/App_Data/keyflare.db`。如果使用 `./App_Data:/app/App_Data`，Docker 会用宿主机目录覆盖镜像内准备好的目录。容器以非 root 用户（UID `1654`）运行，该用户需要对挂载目录及已有的数据库文件有写权限。SQLite 还会在数据库旁创建 `-wal`、`-shm` 文件。[Docker 绑定挂载说明](https://docs.docker.com/engine/storage/bind-mounts/#bind-mounting-over-existing-data)
+
+在标准 Linux Docker 环境下，为首次部署的空目录设置权限，再启动容器：
+
+```sh
+mkdir -p ./App_Data
+sudo chown 1654 ./App_Data
+sudo chmod u+rwx ./App_Data
+docker run -d --name keyflare --restart unless-stopped -p 127.0.0.1:5000:8080 \
+  --mount "type=bind,src=$PWD/App_Data,dst=/app/App_Data" ghcr.io/mopelab/keyflare:latest
+```
+
+如果容器已按此路径挂载且因 `SQLite Error 14: unable to open database file` 启动失败，修正对应宿主机目录权限后执行 `docker restart keyflare`。也可通过 `docker inspect keyflare --format '{{json .Mounts}}'` 核对挂载来源、目标和读写状态。使用 Docker Desktop 或不需要直接访问宿主机目录时，优先使用上面的命名卷示例。
+
 ### 下载发行包
 
 1. 在目标机器上安装对应平台的 **ASP.NET Core Runtime 11.0（x64）**。运行 `dotnet --list-runtimes`，确认列表中有 `Microsoft.AspNetCore.App 11.0.x`。[.NET 11 下载页](https://dotnet.microsoft.com/download/dotnet/11.0)

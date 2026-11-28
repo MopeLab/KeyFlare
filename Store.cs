@@ -28,6 +28,19 @@ public sealed class Store(IConfiguration config, IHostEnvironment environment)
 
     public void Initialize()
     {
+        try
+        {
+            InitializeSchema();
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or SqliteException { SqliteErrorCode: 8 or 14 })
+        {
+            throw new InvalidOperationException(
+                $"Cannot initialize SQLite database '{path}'. Check that this path names a file and that the application user can write to its directory and any existing database files. For Docker bind mounts, check the host directory permissions.", ex);
+        }
+    }
+
+    private void InitializeSchema()
+    {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         using var db = Open();
         using var command = Command(db, """
