@@ -63,8 +63,11 @@ jobs:
         run: |
           docker run --detach --name keyflare-ci --publish 127.0.0.1:18080:8080 \
             --mount source=keyflare-ci,target=/app/App_Data "$IMAGE:$GITHUB_SHA"
-          curl --fail --silent --show-error --retry 12 --retry-connrefused --retry-delay 1 \
-            http://127.0.0.1:18080/admin/login --output /dev/null
+          if ! curl --fail --silent --show-error --max-time 3 --retry 12 --retry-all-errors --retry-delay 1 \
+            http://127.0.0.1:18080/admin/login --output /dev/null; then
+            docker logs keyflare-ci 2>&1 | sed 's/KeyFlare AdminPasswd:.*/KeyFlare AdminPasswd: [redacted]/'
+            exit 1
+          fi
           docker exec keyflare-ci test -s /app/App_Data/keyflare.db
 
       - name: Push to GitHub Container Registry
