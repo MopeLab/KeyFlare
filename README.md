@@ -18,6 +18,49 @@ KeyFlare 使用 ASP.NET Core 11 和 SQLite，一个应用进程同时提供模�
 
 该示例监听本机回环地址。向其他机器提供 API 时，可通过 HTTPS 反向代理转发到这个地址。客户端应使用代理的公开域名，管理员从同一域名的 `/admin` 登录。
 
+### Cloudflare CDN → Nginx → KeyFlare：透传客户端 IP
+
+以下示例假设 Cloudflare 直接回源到 Nginx，Nginx 与 KeyFlare 位于同一台机器，KeyFlare 监听 `127.0.0.1:5000`。配置完成后，可在调用详情的 **原始请求头 → X-Real-IP** 查看访客公网 IP。当前版本的「连接来源 IP」和「客户端 IP」在此拓扑下均显示 Nginx 的回环地址。
+
+1. 为公开域名启用 Cloudflare 代理（橙云），保留 `CF-Connecting-IP` 请求头。要保留原始 IPv6 地址，请将 **Pseudo IPv4** 设为 **Off** 或 **Add Header**；**Overwrite Headers** 会将该头替换为伪 IPv4。[Cloudflare 请求头说明](https://developers.cloudflare.com/fundamentals/reference/http-headers/#cf-connecting-ip)
+2. 确认 Nginx 启用了 `http_realip_module`（可用 `nginx -V 2>&1` 查看编译参数）。创建 `/etc/nginx/cloudflare-realip.conf`，将 Cloudflare 官方 IPv4、IPv6 列表中的**每一个网段**各写成一行 `set_real_ip_from 网段;`。下面的 Bash 命令会生成并安装该文件；官方列表变更时重新生成并重载 Nginx。[IPv4 网段](https://www.cloudflare.com/ips-v4/) · [IPv6 网段](https://www.cloudflare.com/ips-v6/) · [Nginx Real IP 模块](https://nginx.org/en/docs/http/ngx_http_realip_module.html)
+
+   ```bash
+   (
+     set -e
+     tmp=$(mktemp -d)
+     trap 'rm -rf "$tmp"' EXIT
+     for family in v4 v6; do
+       curl -fsSL "https://www.cloudflare.com/ips-$family/" -o "$tmp/$family"
+       test -s "$tmp/$family"
+     done
+     awk 'NF {printf "set_real_ip_from %s;\n", $1}' "$tmp/v4" "$tmp/v6" > "$tmp/realip.conf"
+     sudo install -m 0644 "$tmp/realip.conf" /etc/nginx/cloudflare-realip.conf
+   )
+   ```
+
+3. 在该域名已有的 HTTPS `server` 块中加入以下指令。若已有 `location /`，将代理指令合并进去。只有来自上述可信网段的连接才能通过 `CF-Connecting-IP` 改写 `$remote_addr`。转发时覆盖 `X-Real-IP` 和 `X-Forwarded-For`，避免把访客自行填写的地址当成观测结果。
+
+   ```nginx
+   include /etc/nginx/cloudflare-realip.conf;
+   real_ip_header CF-Connecting-IP;
+
+   location / {
+       proxy_pass http://127.0.0.1:5000;
+       proxy_set_header Host $host;
+       proxy_set_header X-Real-IP $remote_addr;
+       proxy_set_header X-Forwarded-For $remote_addr;
+   }
+   ```
+
+4. 运行 `sudo nginx -t && sudo nginx -s reload`。从已知公网出口的客户端，通过**启用了 Cloudflare 代理的域名**发起一次模型列表请求：
+
+   ```bash
+   curl 'https://你的域名/v1/models' -H 'Authorization: Bearer <诱饵Key>'
+   ```
+
+   打开管理面板中的对应调用，核对「原始请求头」里的 `X-Real-IP` 是否与客户端公网出口一致。如果这里显示 Cloudflare 边缘 IP，检查回源节点是否在已加载的可信网段内，以及 Cloudflare 是否传入了 `CF-Connecting-IP`。
+
 ### 从源码运行
 
 在安装了 .NET 11 SDK 的环境中，进入仓库根目录后执行：
